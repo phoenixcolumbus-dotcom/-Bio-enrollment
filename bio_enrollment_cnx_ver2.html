@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bio Enrollment Dashboard — CNX Airport</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #f5f4f0;
+    --surface: #ffffff;
+    --surface2: #f0ede8;
+    --border: #ddd9d0;
+    --border2: #ccc8be;
+    --text: #1a1916;
+    --text2: #6b6860;
+    --text3: #9e9b94;
+    --blue: #1a5fa8;
+    --blue-bg: #e8f0fb;
+    --blue-text: #0d3d72;
+    --green: #2d7a3a;
+    --green-bg: #e6f4e8;
+    --green-text: #1a4a22;
+    --amber: #b86a00;
+    --amber-bg: #fef3e0;
+    --amber-text: #7a4500;
+    --red: #c0392b;
+    --red-bg: #fdecea;
+    --red-text: #7a1f16;
+    --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font: 'IBM Plex Sans Thai', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: var(--font); background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5; min-height: 100vh; }
+
+  /* LAYOUT */
+  .page { max-width: 1280px; margin: 0 auto; padding: 24px 20px 60px; }
+
+  /* HEADER */
+  .header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 28px; flex-wrap: wrap; gap: 16px; }
+  .header-brand { display: flex; align-items: center; gap: 14px; }
+  .brand-icon { width: 44px; height: 44px; background: var(--blue); border-radius: var(--radius-sm); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .brand-icon svg { width: 24px; height: 24px; fill: white; }
+  .brand-text h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+  .brand-text p { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .chip-date { font-family: var(--mono); font-size: 11px; padding: 5px 12px; border-radius: 20px; background: var(--blue-bg); color: var(--blue-text); font-weight: 500; border: 1px solid #c2d6f5; }
+
+  /* BUTTONS */
+  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-size: 13px; font-weight: 500; cursor: pointer; border: 1px solid var(--border2); background: var(--surface); color: var(--text); transition: all .15s; font-family: var(--font); }
+  .btn:hover { background: var(--surface2); border-color: var(--text3); }
+  .btn-primary { background: var(--blue); color: white; border-color: var(--blue); }
+  .btn-primary:hover { background: var(--blue-text); border-color: var(--blue-text); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-danger { background: var(--red-bg); color: var(--red); border-color: #f5c6c2; }
+  .btn-danger:hover { background: #fad8d5; }
+
+  /* TOP STATS */
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; box-shadow: var(--shadow); }
+  .stat-label { font-size: 11px; color: var(--text2); font-weight: 500; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; line-height: 1.3; }
+  .stat-value { font-size: 24px; font-weight: 600; font-family: var(--mono); letter-spacing: -0.03em; }
+  .stat-sub { font-size: 10px; color: var(--text3); margin-top: 3px; }
+  .stat-blue { color: var(--blue); }
+  .stat-green { color: var(--green); }
+  .stat-amber { color: var(--amber); }
+
+  /* TABS */
+  .tab-bar { display: flex; gap: 0; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; width: fit-content; margin-bottom: 16px; box-shadow: var(--shadow); }
+  .tab { padding: 9px 18px; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text2); background: transparent; border: none; border-right: 1px solid var(--border); transition: all .15s; font-family: var(--font); white-space: nowrap; }
+  .tab:last-child { border-right: none; }
+  .tab.active { background: var(--blue); color: white; }
+  .tab:hover:not(.active) { background: var(--surface2); color: var(--text); }
+  .unk-pill { display: inline-block; background: var(--amber); color: white; border-radius: 20px; padding: 1px 7px; font-size: 10px; margin-left: 5px; vertical-align: middle; }
+
+  /* FILTERS */
+  .filter-row { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .filter-row select { padding: 8px 12px; border: 1px solid var(--border2); border-radius: var(--radius-sm); font-size: 13px; background: var(--surface); color: var(--text); font-family: var(--font); cursor: pointer; outline: none; }
+  .filter-row select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,95,168,.12); }
+
+  /* AIRLINE CARDS */
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; }
+  .acard { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px 18px; box-shadow: var(--shadow); transition: box-shadow .2s; }
+  .acard:hover { box-shadow: 0 4px 16px rgba(0,0,0,.1); }
+  .acard-hdr { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+  .acard-iata { font-family: var(--mono); font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .acard-name { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .acard-country { font-size: 10px; color: var(--text3); margin-top: 1px; }
+  .acard-meta { text-align: right; }
+  .acard-flights { font-size: 10px; color: var(--text3); margin-top: 5px; }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 3px 9px; border-radius: 20px; font-size: 11px; font-weight: 500; letter-spacing: .01em; }
+  .badge-dom { background: var(--green-bg); color: var(--green-text); border: 1px solid #b8e4bf; }
+  .badge-intl { background: var(--blue-bg); color: var(--blue-text); border: 1px solid #c2d6f5; }
+  .badge-new { background: var(--amber-bg); color: var(--amber-text); border: 1px solid #f5d9a0; }
+  .badge-unk { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+
+  /* METRICS INSIDE CARD */
+  .metrics-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .metric-box { background: var(--bg); border-radius: var(--radius-sm); padding: 9px 11px; border: 1px solid var(--border); }
+  .metric-lbl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 3px; }
+  .metric-val { font-size: 16px; font-weight: 600; font-family: var(--mono); }
+  .metric-sub { font-size: 9px; color: var(--text3); margin-top: 1px; }
+
+  /* BARS */
+  .section-divider { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin: 10px 0 7px; }
+  .bar-row { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .bar-lbl { font-size: 11px; color: var(--text2); width: 125px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bar-track { flex: 1; height: 7px; background: var(--surface2); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+  .bar-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+  .bar-val { font-size: 11px; font-weight: 600; font-family: var(--mono); min-width: 32px; text-align: right; }
+
+  /* TABLE */
+  .table-wrap { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 820px; }
+  thead th { padding: 11px 14px; font-size: 11px; font-weight: 600; color: var(--text2); background: var(--surface2); border-bottom: 1px solid var(--border); text-align: left; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; position: sticky; top: 0; }
+  tbody td { padding: 10px 14px; border-bottom: 1px solid var(--border); color: var(--text); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--bg); }
+  .num { text-align: right; font-family: var(--mono); }
+  .tfoot td { padding: 10px 14px; font-weight: 600; background: var(--surface2); border-top: 2px solid var(--border2); font-family: var(--mono); }
+  .tfoot-lbl { font-size: 12px; color: var(--text2); }
+  .unknown-row td { background: #fffbf0; }
+
+  /* ALERT */
+  .alert { padding: 12px 16px; border-radius: var(--radius-sm); font-size: 13px; margin-bottom: 14px; border: 1px solid; }
+  .alert-info { background: var(--blue-bg); color: var(--blue-text); border-color: #c2d6f5; }
+  .alert-warn { background: var(--amber-bg); color: var(--amber-text); border-color: #f5d9a0; }
+
+  /* MODAL */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(10,10,10,.5); display: flex; align-items: center; justify-content: center; z-index: 200; padding: 20px; backdrop-filter: blur(3px); }
+  .modal { background: var(--surface); border-radius: var(--radius); border: 1px solid var(--border); padding: 24px; width: 460px; max-width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,.2); animation: modalIn .2s ease; }
+  @keyframes modalIn { from { opacity:0; transform: scale(.96) translateY(8px); } to { opacity:1; transform:none; } }
+  .modal-title { font-size: 16px; font-weight: 600; margin-bottom: 6px; }
+  .modal-sub { font-size: 12px; color: var(--text2); margin-bottom: 18px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-label { font-size: 11px; font-weight: 600; color: var(--text2); text-transform: uppercase; letter-spacing: .04em; }
+  .form-input { padding: 9px 11px; border: 1px solid var(--border2); border-radius: var(--radius-sm); font-size: 13px; background: var(--surface); color: var(--text); font-family: var(--font); outline: none; transition: border-color .15s, box-shadow .15s; }
+  .form-input:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26,95,168,.12); }
+  .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
+
+  /* CUSTOM IATA LIST */
+  .iata-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 14px; }
+  .iata-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .iata-item:last-child { border-bottom: none; }
+  .iata-item-code { font-family: var(--mono); font-weight: 600; width: 36px; flex-shrink: 0; }
+  .iata-item-name { flex: 1; color: var(--text2); }
+
+  /* HIDDEN */
+  .hidden { display: none !important; }
+
+  /* EMPTY STATE */
+  .empty { text-align: center; padding: 48px 20px; color: var(--text3); font-size: 13px; }
+  .empty-icon { font-size: 36px; margin-bottom: 8px; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+
+  /* FOOTER */
+  .footer { text-align: center; padding-top: 40px; font-size: 11px; color: var(--text3); }
+
+  /* SCROLLBAR */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+  @media (max-width: 640px) {
+    .stats-grid { grid-template-columns: repeat(2, 1fr); }
+    .cards-grid { grid-template-columns: 1fr; }
+    .form-row { grid-template-columns: 1fr; }
+    .tab { padding: 8px 12px; font-size: 12px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-brand">
+      <div class="brand-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 16v-2l-8-5V3.5c0-.83-.67-1.5-1.5-1.5S10 2.67 10 3.5V9l-8 5v2l8-2.5V19l-2 1.5V22l3.5-1 3.5 1v-1.5L13 19v-5.5l8 2.5z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1>Bio Enrollment Dashboard</h1>
+        <p id="sub-header">Chiang Mai International Airport (CNX)</p>
+      </div>
+    </div>
+    <div class="header-actions">
+      <span class="chip-date" id="report-date">2026-04-26</span>
+      <button class="btn" onclick="showIataManager()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        จัดการ IATA
+      </button>
+      <label class="btn btn-primary" style="cursor:pointer" onclick="document.getElementById('xlFile').click()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        อัปโหลดไฟล์ Excel
+      </label>
+      <input type="file" id="xlFile" accept=".xlsx,.xls" class="hidden">
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-grid" id="stats-grid"></div>
+
+  <!-- TABS -->
+  <div class="tab-bar">
+    <button class="tab active" onclick="setTab('cards',this)">ต่อสายการบิน</button>
+    <button class="tab" onclick="setTab('flights',this)">ต่อเที่ยวบิน</button>
+    <button class="tab" onclick="setTab('unknown',this)">ไม่รู้จัก <span class="unk-pill hidden" id="unk-badge">0</span></button>
+  </div>
+
+  <!-- VIEW: CARDS -->
+  <div id="view-cards">
+    <div class="filter-row">
+      <select id="fc-type" onchange="renderCards()">
+        <option value="">— ทุกประเภทเที่ยวบิน —</option>
+        <option value="Domestic">ในประเทศ (Domestic)</option>
+        <option value="International">ต่างประเทศ (International)</option>
+      </select>
+    </div>
+    <div class="cards-grid" id="airline-cards"></div>
+  </div>
+
+  <!-- VIEW: FLIGHTS TABLE -->
+  <div id="view-flights" class="hidden">
+    <div class="filter-row">
+      <select id="ff-airline" onchange="renderFlights()"><option value="">— สายการบินทั้งหมด —</option></select>
+      <select id="ff-type" onchange="renderFlights()">
+        <option value="">— ทุกประเภท —</option>
+        <option value="Domestic">ในประเทศ</option>
+        <option value="International">ต่างประเทศ</option>
+      </select>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>เที่ยวบิน</th><th>IATA</th><th>สายการบิน</th><th>ประเทศ</th><th>ประเภท</th>
+            <th class="num">Total<br>Enrolled</th>
+            <th class="num">Assisted CI<br>(Row 37)</th>
+            <th class="num">Kiosk<br>(Row 44)</th>
+            <th class="num">Security<br>(Row 102)</th>
+            <th class="num">Boarding<br>(Row 107)</th>
+          </tr>
+        </thead>
+        <tbody id="flight-tbody"></tbody>
+        <tfoot id="flight-tfoot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- VIEW: UNKNOWN -->
+  <div id="view-unknown" class="hidden">
+    <div class="alert alert-warn">
+      ⚠️ เที่ยวบินเหล่านี้มี IATA Code ที่ยังไม่มีในฐานข้อมูล กรุณากดปุ่ม <strong>"จำแนกสายการบิน"</strong> เพื่อระบุข้อมูล หรือใช้ปุ่ม <strong>"จัดการ IATA"</strong> ด้านบน
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>IATA (ไม่รู้จัก)</th><th>เที่ยวบิน</th><th class="num">Total Enrolled</th><th class="num">Security</th><th class="num">Boarding</th><th>การจำแนก</th></tr>
+        </thead>
+        <tbody id="unknown-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="footer">Bio Enrollment Dashboard · CNX Airport · สร้างด้วย Claude AI</div>
+</div>
+
+<!-- MODAL: IATA MANAGER -->
+<div class="modal-overlay hidden" id="iata-modal" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal">
+    <div class="modal-title">จัดการฐานข้อมูล IATA</div>
+    <div class="modal-sub">เพิ่มหรือลบ IATA Code เพื่อให้ระบบจำแนกสายการบินและประเภทเที่ยวบินได้ถูกต้อง</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">IATA Code (2 ตัวอักษร)</label>
+        <input class="form-input" id="new-iata" maxlength="3" placeholder="เช่น AK" style="text-transform:uppercase;font-family:var(--mono)">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ชื่อสายการบิน</label>
+        <input class="form-input" id="new-name" placeholder="เช่น AirAsia">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">ประเทศ</label>
+        <input class="form-input" id="new-country" placeholder="เช่น Malaysia">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ประเภทเที่ยวบิน</label>
+        <select class="form-input" id="new-type">
+          <option value="Domestic">ในประเทศ (Domestic)</option>
+          <option value="International">ต่างประเทศ (International)</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:16px" onclick="addIata()">
+      เพิ่ม IATA Code ใหม่
+    </button>
+    <div class="section-title">IATA ที่เพิ่มเอง</div>
+    <div class="iata-list" id="custom-iata-list"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('iata-modal').classList.add('hidden')">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: CLASSIFY UNKNOWN -->
+<div class="modal-overlay hidden" id="classify-modal" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal">
+    <div class="modal-title">จำแนก IATA: <span id="classify-code" style="color:var(--blue);font-family:var(--mono)"></span></div>
+    <div class="modal-sub">ระบบไม่พบข้อมูลสายการบินนี้ในฐานข้อมูล กรุณากรอกเพื่อจำแนก</div>
+    <div class="form-row">
+      <div class="form-group">
+        <label class="form-label">ชื่อสายการบิน</label>
+        <input class="form-input" id="cl-name" placeholder="ชื่อเต็มสายการบิน">
+      </div>
+      <div class="form-group">
+        <label class="form-label">ประเทศ</label>
+        <input class="form-input" id="cl-country" placeholder="เช่น Thailand">
+      </div>
+    </div>
+    <div class="form-group" style="margin-bottom:6px">
+      <label class="form-label">ประเภทเที่ยวบิน</label>
+      <select class="form-input" id="cl-type">
+        <option value="Domestic">ในประเทศ (Domestic)</option>
+        <option value="International">ต่างประเทศ (International)</option>
+      </select>
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('classify-modal').classList.add('hidden')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveClassify()">บันทึกและจำแนก</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================
+// IATA DATABASE
+// =============================================
+const BUILTIN_IATA = {
+  // Thai Domestic
+  DD:{name:'Nok Air',country:'Thailand',type:'Domestic',color:'#c0392b'},
+  FD:{name:'Thai AirAsia',country:'Thailand',type:'Domestic',color:'#e67e22'},
+  PG:{name:'Bangkok Airways',country:'Thailand',type:'Domestic',color:'#27ae60'},
+  SL:{name:'Thai Lion Air',country:'Thailand',type:'Domestic',color:'#c0392b'},
+  TG:{name:'Thai Airways International',country:'Thailand',type:'Domestic',color:'#8e44ad'},
+  VZ:{name:'Thai VietJet Air',country:'Thailand',type:'Domestic',color:'#16a085'},
+  WE:{name:'Thai Smile Airways',country:'Thailand',type:'Domestic',color:'#d35400'},
+  IQ:{name:'Kan Airlines',country:'Thailand',type:'Domestic',color:'#2980b9'},
+  // International
+  AK:{name:'AirAsia',country:'Malaysia',type:'International',color:'#c0392b'},
+  QZ:{name:'Indonesia AirAsia',country:'Indonesia',type:'International',color:'#e74c3c'},
+  D7:{name:'AirAsia X',country:'Malaysia',type:'International',color:'#c0392b'},
+  CX:{name:'Cathay Pacific',country:'Hong Kong',type:'International',color:'#16a085'},
+  EK:{name:'Emirates',country:'UAE',type:'International',color:'#c0392b'},
+  QR:{name:'Qatar Airways',country:'Qatar',type:'International',color:'#8e44ad'},
+  SQ:{name:'Singapore Airlines',country:'Singapore',type:'International',color:'#2c3e50'},
+  MH:{name:'Malaysia Airlines',country:'Malaysia',type:'International',color:'#2980b9'},
+  OZ:{name:'Asiana Airlines',country:'South Korea',type:'International',color:'#16a085'},
+  KE:{name:'Korean Air',country:'South Korea',type:'International',color:'#1a5fa8'},
+  NH:{name:'All Nippon Airways (ANA)',country:'Japan',type:'International',color:'#1a5fa8'},
+  JL:{name:'Japan Airlines',country:'Japan',type:'International',color:'#c0392b'},
+  CI:{name:'China Airlines',country:'Taiwan',type:'International',color:'#1a5fa8'},
+  BR:{name:'EVA Air',country:'Taiwan',type:'International',color:'#27ae60'},
+  CZ:{name:'China Southern Airlines',country:'China',type:'International',color:'#1a5fa8'},
+  MU:{name:'China Eastern Airlines',country:'China',type:'International',color:'#c0392b'},
+  CA:{name:'Air China',country:'China',type:'International',color:'#c0392b'},
+  HX:{name:'Hong Kong Airlines',country:'Hong Kong',type:'International',color:'#c0392b'},
+  VN:{name:'Vietnam Airlines',country:'Vietnam',type:'International',color:'#c0392b'},
+  VJ:{name:'VietJet Air',country:'Vietnam',type:'International',color:'#c0392b'},
+  BL:{name:'Pacific Airlines',country:'Vietnam',type:'International',color:'#8e44ad'},
+  SV:{name:'Saudia',country:'Saudi Arabia',type:'International',color:'#27ae60'},
+  LH:{name:'Lufthansa',country:'Germany',type:'International',color:'#1a5fa8'},
+  BA:{name:'British Airways',country:'United Kingdom',type:'International',color:'#1a5fa8'},
+  AF:{name:'Air France',country:'France',type:'International',color:'#1a5fa8'},
+  KL:{name:'KLM Royal Dutch Airlines',country:'Netherlands',type:'International',color:'#1a5fa8'},
+  TK:{name:'Turkish Airlines',country:'Turkey',type:'International',color:'#c0392b'},
+  EY:{name:'Etihad Airways',country:'UAE',type:'International',color:'#8e44ad'},
+  AI:{name:'Air India',country:'India',type:'International',color:'#c0392b'},
+  '6E':{name:'IndiGo',country:'India',type:'International',color:'#8e44ad'},
+  GA:{name:'Garuda Indonesia',country:'Indonesia',type:'International',color:'#1a5fa8'},
+  JT:{name:'Lion Air',country:'Indonesia',type:'International',color:'#e74c3c'},
+  '8M':{name:'Myanmar Airways International',country:'Myanmar',type:'International',color:'#27ae60'},
+  UB:{name:'Myanmar National Airlines',country:'Myanmar',type:'International',color:'#27ae60'},
+  K7:{name:'Air KBZ',country:'Myanmar',type:'International',color:'#8e44ad'},
+  '3U':{name:'Sichuan Airlines',country:'China',type:'International',color:'#1a5fa8'},
+  ZH:{name:'Shenzhen Airlines',country:'China',type:'International',color:'#1a5fa8'},
+  HO:{name:'Juneyao Airlines',country:'China',type:'International',color:'#1a5fa8'},
+  PR:{name:'Philippine Airlines',country:'Philippines',type:'International',color:'#1a5fa8'},
+  '5J':{name:'Cebu Pacific',country:'Philippines',type:'International',color:'#e67e22'},
+  Z2:{name:'AirAsia Philippines',country:'Philippines',type:'International',color:'#e74c3c'},
+  FZ:{name:'flydubai',country:'UAE',type:'International',color:'#e67e22'},
+  WY:{name:'Oman Air',country:'Oman',type:'International',color:'#c0392b'},
+  UL:{name:'SriLankan Airlines',country:'Sri Lanka',type:'International',color:'#1a5fa8'},
+};
+
+let customIATA = {};
+let currentClassifyCode = null;
+let currentTab = 'cards';
+
+function getIata(code) {
+  return customIATA[code] || BUILTIN_IATA[code] || null;
+}
+
+// =============================================
+// FLIGHT DATA (Built-in from CNX 2026-04-26)
+// =============================================
+const BUILTIN_FLIGHTS = [
+  {flight:'AK0857',r17:0,r37:0,r44:0,r102:5,r107:0},
+  {flight:'DD0121',r17:26,r37:22,r44:4,r102:27,r107:33},
+  {flight:'DD0123',r17:11,r37:10,r44:1,r102:9,r107:0},
+  {flight:'DD0125',r17:42,r37:35,r44:7,r102:21,r107:25},
+  {flight:'DD0133',r17:20,r37:8,r44:12,r102:17,r107:18},
+  {flight:'DD0135',r17:37,r37:23,r44:14,r102:23,r107:16},
+  {flight:'FD0870',r17:0,r37:0,r44:0,r102:0,r107:0},
+  {flight:'FD2010',r17:3,r37:2,r44:1,r102:10,r107:10},
+  {flight:'FD3070',r17:3,r37:1,r44:2,r102:1,r107:1},
+  {flight:'FD3074',r17:1,r37:0,r44:1,r102:1,r107:0},
+  {flight:'FD3160',r17:0,r37:0,r44:0,r102:2,r107:0},
+  {flight:'FD3162',r17:6,r37:3,r44:3,r102:7,r107:6},
+  {flight:'FD3168',r17:1,r37:0,r44:1,r102:5,r107:4},
+  {flight:'FD3417',r17:12,r37:6,r44:6,r102:12,r107:8},
+  {flight:'FD3420',r17:20,r37:11,r44:9,r102:37,r107:26},
+  {flight:'FD3426',r17:22,r37:9,r44:13,r102:43,r107:40},
+  {flight:'FD3428',r17:41,r37:24,r44:17,r102:59,r107:40},
+  {flight:'FD3430',r17:37,r37:17,r44:20,r102:73,r107:53},
+  {flight:'FD3438',r17:22,r37:16,r44:6,r102:33,r107:34},
+  {flight:'FD3442',r17:14,r37:9,r44:5,r102:38,r107:25},
+  {flight:'FD3444',r17:21,r37:11,r44:10,r102:35,r107:25},
+  {flight:'FD3448',r17:32,r37:26,r44:6,r102:55,r107:50},
+  {flight:'FD3900',r17:5,r37:4,r44:1,r102:27,r107:20},
+  {flight:'FD4105',r17:12,r37:6,r44:6,r102:16,r107:13},
+  {flight:'FD4117',r17:15,r37:4,r44:11,r102:29,r107:22},
+  {flight:'FD4119',r17:9,r37:1,r44:8,r102:18,r107:11},
+  {flight:'FD4121',r17:22,r37:15,r44:7,r102:37,r107:25},
+  {flight:'FD5422',r17:3,r37:0,r44:3,r102:0,r107:0},
+  {flight:'FD5500',r17:16,r37:7,r44:9,r102:32,r107:25},
+  {flight:'FD8436',r17:18,r37:9,r44:9,r102:27,r107:22},
+  {flight:'FD8440',r17:35,r37:15,r44:20,r102:56,r107:57},
+  {flight:'PG0216',r17:17,r37:12,r44:5,r102:14,r107:14},
+  {flight:'PG0218',r17:19,r37:19,r44:0,r102:15,r107:16},
+  {flight:'PG0220',r17:23,r37:21,r44:2,r102:25,r107:21},
+  {flight:'PG0224',r17:25,r37:24,r44:1,r102:21,r107:0},
+  {flight:'PG0242',r17:3,r37:3,r44:0,r102:2,r107:0},
+  {flight:'SL0507',r17:40,r37:35,r44:5,r102:57,r107:49},
+  {flight:'SL0509',r17:15,r37:5,r44:10,r102:56,r107:54},
+  {flight:'SL0511',r17:17,r37:15,r44:2,r102:29,r107:22},
+  {flight:'SL0513',r17:28,r37:25,r44:3,r102:58,r107:58},
+  {flight:'SL0515',r17:26,r37:22,r44:4,r102:54,r107:47},
+  {flight:'SL0519',r17:26,r37:26,r44:0,r102:32,r107:47},
+  {flight:'SL0521',r17:19,r37:11,r44:8,r102:65,r107:50},
+  {flight:'SL0581',r17:16,r37:15,r44:1,r102:15,r107:9},
+  {flight:'TG0103',r17:37,r37:35,r44:2,r102:32,r107:23},
+  {flight:'TG0105',r17:30,r37:23,r44:7,r102:26,r107:24},
+  {flight:'TG0107',r17:34,r37:30,r44:4,r102:30,r107:0},
+  {flight:'TG0111',r17:31,r37:24,r44:7,r102:29,r107:22},
+  {flight:'TG0113',r17:21,r37:19,r44:2,r102:28,r107:26},
+  {flight:'TG0121',r17:16,r37:13,r44:3,r102:16,r107:14},
+  {flight:'VZ0103',r17:13,r37:4,r44:9,r102:24,r107:0},
+  {flight:'VZ0107',r17:38,r37:30,r44:8,r102:44,r107:44},
+  {flight:'VZ0111',r17:7,r37:2,r44:5,r102:13,r107:1},
+  {flight:'VZ0414',r17:1,r37:0,r44:1,r102:2,r107:0},
+  {flight:'VZ0416',r17:10,r37:8,r44:2,r102:5,r107:0},
+  {flight:'VZ2105',r17:26,r37:23,r44:3,r102:22,r107:27},
+  {flight:'VZ2107',r17:26,r37:14,r44:12,r102:38,r107:0},
+];
+
+let allFlights = BUILTIN_FLIGHTS;
+
+// =============================================
+// ENRICH & AGGREGATE
+// =============================================
+function enrichFlight(f) {
+  const iata = f.flight.slice(0, 2);
+  const info = getIata(iata);
+  return {
+    ...f, iata,
+    airline: info ? info.name : 'Unknown',
+    type: info ? info.type : 'Unknown',
+    country: info ? info.country : '—',
+    color: info ? (info.color || '#888') : '#9e9b94',
+    isNew: !!customIATA[iata],
+    isUnknown: !info,
+  };
+}
+
+function getEnriched() { return allFlights.map(enrichFlight); }
+
+function aggByAirline(data) {
+  const map = {};
+  data.forEach(d => {
+    if (!map[d.iata]) map[d.iata] = { iata:d.iata, airline:d.airline, type:d.type, country:d.country, color:d.color, isNew:d.isNew, isUnknown:d.isUnknown, flights:0, r17:0, r37:0, r44:0, r102:0, r107:0 };
+    const m = map[d.iata];
+    m.flights++; m.r17+=d.r17; m.r37+=d.r37; m.r44+=d.r44; m.r102+=d.r102; m.r107+=d.r107;
+  });
+  return Object.values(map).sort((a,b) => b.r17 - a.r17);
+}
+
+function fmt(n) { return Number(n).toLocaleString('th-TH'); }
+
+// =============================================
+// RENDER STATS
+// =============================================
+function renderStats() {
+  const data = getEnriched().filter(d => !d.isUnknown);
+  const unk = getEnriched().filter(d => d.isUnknown);
+  const dom = data.filter(d => d.type === 'Domestic').length;
+  const intl = data.filter(d => d.type === 'International').length;
+  const t = k => data.reduce((s,d) => s + d[k], 0);
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card"><div class="stat-label">เที่ยวบินทั้งหมด</div><div class="stat-value">${data.length}</div><div class="stat-sub">${unk.length > 0 ? `⚠ ${unk.length} ไม่รู้จัก` : 'จำแนกครบแล้ว ✓'}</div></div>
+    <div class="stat-card"><div class="stat-label">ในประเทศ</div><div class="stat-value stat-green">${dom}</div><div class="stat-sub">Domestic</div></div>
+    <div class="stat-card"><div class="stat-label">ต่างประเทศ</div><div class="stat-value stat-blue">${intl}</div><div class="stat-sub">International</div></div>
+    <div class="stat-card"><div class="stat-label">Total Enrolled</div><div class="stat-value stat-blue">${fmt(t('r17'))}</div><div class="stat-sub">ทุก touchpoint</div></div>
+    <div class="stat-card"><div class="stat-label">Assisted CI<br>Enrolled</div><div class="stat-value">${fmt(t('r37'))}</div><div class="stat-sub">Row 37</div></div>
+    <div class="stat-card"><div class="stat-label">Kiosk<br>Enrolled</div><div class="stat-value">${fmt(t('r44'))}</div><div class="stat-sub">Row 44</div></div>
+    <div class="stat-card"><div class="stat-label">Security<br>Face Match</div><div class="stat-value stat-green">${fmt(t('r102'))}</div><div class="stat-sub">Row 102</div></div>
+    <div class="stat-card"><div class="stat-label">Boarding<br>Face Match</div><div class="stat-value stat-green">${fmt(t('r107'))}</div><div class="stat-sub">Row 107</div></div>
+  `;
+
+  const unkCount = getEnriched().filter(d => d.isUnknown).length;
+  const badge = document.getElementById('unk-badge');
+  if (unkCount > 0) { badge.classList.remove('hidden'); badge.textContent = unkCount; }
+  else badge.classList.add('hidden');
+}
+
+// =============================================
+// RENDER CARDS
+// =============================================
+function renderCards() {
+  const filterType = document.getElementById('fc-type').value;
+  let airlines = aggByAirline(getEnriched().filter(d => !d.isUnknown));
+  if (filterType) airlines = airlines.filter(a => a.type === filterType);
+  const maxR102 = Math.max(...airlines.map(a => a.r102), 1);
+  const maxR107 = Math.max(...airlines.map(a => a.r107), 1);
+
+  if (!airlines.length) {
+    document.getElementById('airline-cards').innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✈</div>ไม่พบข้อมูล</div>';
+    return;
+  }
+
+  document.getElementById('airline-cards').innerHTML = airlines.map(a => {
+    const enrollPct = a.r17 > 0 ? ((a.r37 + a.r44) / a.r17 * 100).toFixed(0) : 0;
+    const typeBadge = a.type === 'International'
+      ? '<span class="badge badge-intl">ต่างประเทศ</span>'
+      : '<span class="badge badge-dom">ในประเทศ</span>';
+    const newBadge = a.isNew ? ' <span class="badge badge-new" style="margin-top:4px;display:inline-block">เพิ่งเพิ่ม</span>' : '';
+    return `
+    <div class="acard">
+      <div class="acard-hdr">
+        <div>
+          <div class="acard-iata" style="color:${a.color}">${a.iata}</div>
+          <div class="acard-name">${a.airline}</div>
+          <div class="acard-country">${a.country}</div>
+        </div>
+        <div class="acard-meta">
+          ${typeBadge}${newBadge}
+          <div class="acard-flights">${a.flights} เที่ยวบิน</div>
+        </div>
+      </div>
+      <div class="section-divider">Enrollment</div>
+      <div class="metrics-2col">
+        <div class="metric-box" style="grid-column:1/-1">
+          <div class="metric-lbl">Total Enrolled</div>
+          <div class="metric-val" style="color:${a.color}">${fmt(a.r17)}</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-lbl">Counter Check-in (R37)</div>
+          <div class="metric-val">${fmt(a.r37)}</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-lbl">Kiosk (R44)</div>
+          <div class="metric-val">${fmt(a.r44)}</div>
+        </div>
+      </div>
+      <div class="section-divider">การใช้งาน Face Match</div>
+      <div class="metrics-2col">
+        <div class="metric-box">
+          <div class="metric-lbl">Security (R102)</div>
+          <div class="metric-val" style="color:#2d7a3a">${fmt(a.r102)}</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-lbl">Boarding (R107)</div>
+          <div class="metric-val" style="color:#1a5fa8">${fmt(a.r107)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// =============================================
+// RENDER FLIGHT TABLE
+// =============================================
+function populateFlightFilter() {
+  const known = getEnriched().filter(d => !d.isUnknown);
+  const airlines = [...new Set(known.map(d => d.iata))].sort();
+  document.getElementById('ff-airline').innerHTML = '<option value="">— สายการบินทั้งหมด —</option>' +
+    airlines.map(a => { const info = getIata(a); return `<option value="${a}">${a} — ${info?.name||a}</option>`; }).join('');
+}
+
+function renderFlights() {
+  const fa = document.getElementById('ff-airline').value;
+  const ft = document.getElementById('ff-type').value;
+  let data = getEnriched().filter(d => !d.isUnknown);
+  if (fa) data = data.filter(d => d.iata === fa);
+  if (ft) data = data.filter(d => d.type === ft);
+  const tot = data.reduce((s,d) => ({r17:s.r17+d.r17,r37:s.r37+d.r37,r44:s.r44+d.r44,r102:s.r102+d.r102,r107:s.r107+d.r107}), {r17:0,r37:0,r44:0,r102:0,r107:0});
+  const typeBadge = t => t==='International'
+    ? '<span class="badge badge-intl">ต่างประเทศ</span>'
+    : '<span class="badge badge-dom">ในประเทศ</span>';
+  document.getElementById('flight-tbody').innerHTML = data.map(d => `
+    <tr>
+      <td><strong style="color:${d.color};font-family:var(--mono)">${d.flight}</strong>${d.isNew?' <span class="badge badge-new" style="font-size:9px">ใหม่</span>':''}</td>
+      <td><span style="font-family:var(--mono);font-weight:600">${d.iata}</span></td>
+      <td>${d.airline}</td>
+      <td style="color:var(--text3);font-size:12px">${d.country}</td>
+      <td>${typeBadge(d.type)}</td>
+      <td class="num">${fmt(d.r17)}</td>
+      <td class="num">${fmt(d.r37)}</td>
+      <td class="num">${fmt(d.r44)}</td>
+      <td class="num" style="color:#2d7a3a;font-weight:600">${fmt(d.r102)}</td>
+      <td class="num" style="color:#1a5fa8;font-weight:600">${fmt(d.r107)}</td>
+    </tr>`).join('') || '<tr><td colspan="10" class="empty">ไม่พบข้อมูล</td></tr>';
+  document.getElementById('flight-tfoot').innerHTML = `
+    <tr>
+      <td colspan="5" class="tfoot-lbl">รวม ${data.length} เที่ยวบิน</td>
+      <td class="num tfoot">${fmt(tot.r17)}</td>
+      <td class="num tfoot">${fmt(tot.r37)}</td>
+      <td class="num tfoot">${fmt(tot.r44)}</td>
+      <td class="num tfoot" style="color:#2d7a3a">${fmt(tot.r102)}</td>
+      <td class="num tfoot" style="color:#1a5fa8">${fmt(tot.r107)}</td>
+    </tr>`;
+}
+
+// =============================================
+// RENDER UNKNOWN
+// =============================================
+function renderUnknown() {
+  const data = getEnriched().filter(d => d.isUnknown);
+  if (!data.length) {
+    document.getElementById('unknown-tbody').innerHTML = '<tr><td colspan="6" class="empty"><div class="empty-icon">✓</div>ไม่มีเที่ยวบินที่ไม่รู้จัก ทุก IATA ถูกจำแนกแล้ว</td></tr>';
+    return;
+  }
+  const unkAirlines = [...new Set(data.map(d => d.iata))];
+  document.getElementById('unknown-tbody').innerHTML = unkAirlines.map(iata => {
+    const flights = data.filter(d => d.iata === iata);
+    const t = flights.reduce((s,d) => ({r17:s.r17+d.r17,r102:s.r102+d.r102,r107:s.r107+d.r107}), {r17:0,r102:0,r107:0});
+    return `<tr class="unknown-row">
+      <td><strong style="font-family:var(--mono);color:#b86a00">${iata}</strong></td>
+      <td style="color:var(--text2);font-size:12px">${flights.map(f=>f.flight).join(', ')}</td>
+      <td class="num">${fmt(t.r17)}</td>
+      <td class="num">${fmt(t.r102)}</td>
+      <td class="num">${fmt(t.r107)}</td>
+      <td><button class="btn btn-sm" onclick="openClassify('${iata}')">จำแนกสายการบิน →</button></td>
+    </tr>`;
+  }).join('');
+}
+
+// =============================================
+// TABS
+// =============================================
+function setTab(tab, el) {
+  currentTab = tab;
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  ['cards','flights','unknown'].forEach(v => {
+    document.getElementById('view-'+v).classList.toggle('hidden', v !== tab);
+  });
+  if (tab === 'flights') renderFlights();
+  if (tab === 'unknown') renderUnknown();
+}
+
+// =============================================
+// IATA MANAGER
+// =============================================
+function showIataManager() {
+  renderCustomList();
+  document.getElementById('iata-modal').classList.remove('hidden');
+}
+
+function renderCustomList() {
+  const entries = Object.entries(customIATA);
+  document.getElementById('custom-iata-list').innerHTML = entries.length === 0
+    ? '<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center">ยังไม่มี IATA ที่เพิ่มเอง</div>'
+    : entries.map(([code, info]) => `
+      <div class="iata-item">
+        <span class="iata-item-code">${code}</span>
+        <span class="iata-item-name">${info.name} · ${info.country}</span>
+        <span class="badge ${info.type==='International'?'badge-intl':'badge-dom'}" style="margin-right:8px;flex-shrink:0">${info.type==='International'?'ต่างประเทศ':'ในประเทศ'}</span>
+        <button class="btn btn-sm btn-danger" onclick="deleteCustomIata('${code}')">ลบ</button>
+      </div>`).join('');
+}
+
+function addIata() {
+  const code = document.getElementById('new-iata').value.trim().toUpperCase();
+  const name = document.getElementById('new-name').value.trim();
+  const country = document.getElementById('new-country').value.trim();
+  const type = document.getElementById('new-type').value;
+  if (!code || !name) { alert('กรุณากรอก IATA Code และชื่อสายการบิน'); return; }
+  const palette = ['#c0392b','#2980b9','#27ae60','#8e44ad','#16a085','#d35400','#2c3e50'];
+  customIATA[code] = { name, country: country||'Unknown', type, color: palette[Object.keys(customIATA).length % palette.length] };
+  document.getElementById('new-iata').value = '';
+  document.getElementById('new-name').value = '';
+  document.getElementById('new-country').value = '';
+  renderCustomList();
+  init();
+}
+
+function deleteCustomIata(code) {
+  if (!confirm(`ลบ IATA "${code}" ออกจากฐานข้อมูล?`)) return;
+  delete customIATA[code];
+  renderCustomList();
+  init();
+}
+
+function openClassify(iataCode) {
+  currentClassifyCode = iataCode;
+  document.getElementById('classify-code').textContent = iataCode;
+  document.getElementById('cl-name').value = '';
+  document.getElementById('cl-country').value = '';
+  document.getElementById('classify-modal').classList.remove('hidden');
+}
+
+function saveClassify() {
+  if (!currentClassifyCode) return;
+  const name = document.getElementById('cl-name').value.trim();
+  const country = document.getElementById('cl-country').value.trim();
+  const type = document.getElementById('cl-type').value;
+  if (!name) { alert('กรุณากรอกชื่อสายการบิน'); return; }
+  const palette = ['#c0392b','#2980b9','#27ae60','#8e44ad','#16a085','#d35400'];
+  customIATA[currentClassifyCode] = { name, country: country||'Unknown', type, color: palette[Object.keys(customIATA).length % palette.length] };
+  document.getElementById('classify-modal').classList.add('hidden');
+  init();
+  if (currentTab === 'unknown') renderUnknown();
+}
+
+// =============================================
+// XLSX PARSER
+// =============================================
+function parseXlsx(buf) {
+  const wb = XLSX.read(buf, { type: 'array' });
+  const wsName = wb.SheetNames.find(n => /flight summary/i.test(n)) || wb.SheetNames[0];
+  const ws = wb.Sheets[wsName];
+  const flights = [];
+  for (let c = 1; c < 300; c++) {
+    const cell = ws[XLSX.utils.encode_cell({ r: 10, c })];
+    if (!cell || !cell.v) { if (c > 5 && flights.length > 0) break; continue; }
+    const v = String(cell.v);
+    if (/carrier|flight|^$/i.test(v)) continue;
+    const g = r => { const x = ws[XLSX.utils.encode_cell({ r: r-1, c })]; return Number(x?.v) || 0; };
+    flights.push({ flight: v, r17: g(17), r37: g(37), r44: g(44), r102: g(102), r107: g(107) });
+  }
+  return flights;
+}
+
+document.getElementById('xlFile').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const parsed = parseXlsx(ev.target.result);
+      if (!parsed.length) { alert('ไม่พบข้อมูลใน sheet "Flight Summary"'); return; }
+      allFlights = parsed;
+      const m = file.name.match(/\d{4}-\d{2}-\d{2}/);
+      const dateStr = m ? m[0] : file.name;
+      document.getElementById('report-date').textContent = dateStr;
+      document.getElementById('sub-header').textContent = `Chiang Mai International Airport (CNX) · ${dateStr}`;
+      init();
+    } catch(err) { alert('อ่านไฟล์ไม่ได้: ' + err.message); }
+  };
+  reader.readAsArrayBuffer(file);
+  e.target.value = '';
+});
+
+// =============================================
+// INIT
+// =============================================
+function init() {
+  renderStats();
+  populateFlightFilter();
+  if (currentTab === 'cards') renderCards();
+  else if (currentTab === 'flights') renderFlights();
+  else if (currentTab === 'unknown') renderUnknown();
+}
+
+init();
+</script>
+</body>
+</html>
