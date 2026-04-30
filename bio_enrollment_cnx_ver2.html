@@ -6,6 +6,8 @@
 <title>Bio Enrollment Dashboard — CNX Airport</title>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
   :root {
     --bg: #f5f4f0;
@@ -215,6 +217,14 @@
     </div>
     <div class="header-actions">
       <span class="chip-date" id="report-date">2026-04-26</span>
+      <select id="airport-select" style="padding:5px 10px;border:1px solid var(--border2);border-radius:var(--radius-sm);font-size:12px;font-family:var(--mono);background:var(--surface);color:var(--text);cursor:pointer" onchange="switchAirport(this.value)">
+        <option value="CNX">CNX — เชียงใหม่</option>
+        <option value="BKK">BKK — สุวรรณภูมิ</option>
+        <option value="DMK">DMK — ดอนเมือง</option>
+        <option value="HKT">HKT — ภูเก็ต</option>
+        <option value="HDY">HDY — หาดใหญ่</option>
+        <option value="USM">USM — สมุย</option>
+      </select>
       <span class="save-badge hidden" id="save-badge"><span class="save-badge-dot"></span>บันทึกแล้ว</span>
       <button class="btn" onclick="showIataManager()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
@@ -477,30 +487,124 @@ let currentClassifyCode = null;
 let currentTab = 'cards';
 
 // =============================================
-// LOCALSTORAGE PERSISTENCE
+// FIREBASE SETUP
 // =============================================
-const LS_CUSTOM = 'bioDash_customIATA';
-const LS_OVERRIDE = 'bioDash_flightOverrides';
+const firebaseConfig = {
+  apiKey: "AIzaSyAVeed4Z5oaRjiBQLT5dFVDQoXsVX1eiMY",
+  authDomain: "bio-enrollment.firebaseapp.com",
+  databaseURL: "https://bio-enrollment-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "bio-enrollment",
+  storageBucket: "bio-enrollment.appspot.com",
+  messagingSenderId: "164689736617",
+  appId: "1:164689736617:web:7930e12496ffd81ab34ab8"
+};
 
-function saveToStorage() {
-  try {
-    localStorage.setItem(LS_CUSTOM, JSON.stringify(customIATA));
-    localStorage.setItem(LS_OVERRIDE, JSON.stringify(flightOverrides));
-    // Flash save badge
-    const badge = document.getElementById('save-badge');
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const refOverrides = db.ref('flightOverrides');
+const refCustom    = db.ref('customIATA');
+const refFlights   = db.ref('flightData');   // เก็บข้อมูล flight + วันที่ + สนามบิน
+
+// Sync indicator
+function showSyncStatus(status) {
+  const badge = document.getElementById('save-badge');
+  const dot   = badge.querySelector('.save-badge-dot');
+  if (status === 'saving') {
     badge.classList.remove('hidden');
+    badge.style.background = 'var(--amber-bg)';
+    badge.style.color      = 'var(--amber-text)';
+    badge.style.borderColor = '#f5d9a0';
+    dot.style.background   = 'var(--amber)';
+    badge.querySelector('span:last-child') && (badge.lastChild.textContent = '');
+    badge.innerHTML = '<span class="save-badge-dot" style="background:var(--amber)"></span>กำลังบันทึก...';
+  } else if (status === 'saved') {
+    badge.classList.remove('hidden');
+    badge.style.background = 'var(--green-bg)';
+    badge.style.color      = 'var(--green-text)';
+    badge.style.borderColor = '#b8e4bf';
+    badge.innerHTML = '<span class="save-badge-dot" style="background:var(--green)"></span>ซิงค์แล้ว ✓';
     clearTimeout(badge._timer);
-    badge._timer = setTimeout(() => badge.classList.add('hidden'), 2500);
-  } catch(e) { /* localStorage not available (e.g. private mode) */ }
+    badge._timer = setTimeout(() => badge.classList.add('hidden'), 3000);
+  } else if (status === 'error') {
+    badge.classList.remove('hidden');
+    badge.style.background = 'var(--red-bg)';
+    badge.style.color      = 'var(--red-text)';
+    badge.style.borderColor = '#f5c6c2';
+    badge.innerHTML = '<span class="save-badge-dot" style="background:var(--red)"></span>บันทึกไม่ได้ ⚠';
+  } else if (status === 'online') {
+    badge.classList.remove('hidden');
+    badge.style.background = 'var(--blue-bg)';
+    badge.style.color      = 'var(--blue-text)';
+    badge.style.borderColor = '#c2d6f5';
+    badge.innerHTML = '<span class="save-badge-dot" style="background:var(--blue)"></span>🔥 Firebase พร้อม';
+    clearTimeout(badge._timer);
+    badge._timer = setTimeout(() => badge.classList.add('hidden'), 3000);
+  }
+}
+
+// =============================================
+// FIREBASE PERSISTENCE (แทน localStorage)
+// =============================================
+function saveToStorage() {
+  showSyncStatus('saving');
+  Promise.all([
+    refOverrides.set(Object.keys(flightOverrides).length ? flightOverrides : null),
+    refCustom.set(Object.keys(customIATA).length ? customIATA : null)
+  ]).then(() => showSyncStatus('saved'))
+    .catch(() => showSyncStatus('error'));
+}
+
+let currentAirport = 'CNX';
+let flightDataListener = null;
+
+function switchAirport(code) {
+  currentAirport = code;
+  // ยกเลิก listener เก่า
+  if (flightDataListener) {
+    db.ref('flightData/' + flightDataListener).off();
+  }
+  // reset เป็น builtin ก่อน
+  allFlights = BUILTIN_FLIGHTS;
+  document.getElementById('report-date').textContent = '—';
+  document.getElementById('sub-header').textContent = code + ' · รอข้อมูล...';
+  listenFlightData(code);
+}
+
+function listenFlightData(airport) {
+  flightDataListener = airport;
+  db.ref('flightData/' + airport).on('value', snap => {
+    const data = snap.val();
+    if (data && data.flights && data.flights.length) {
+      allFlights = data.flights;
+      document.getElementById('report-date').textContent = data.date || '—';
+      document.getElementById('sub-header').textContent =
+        `${airport} · ${data.date || ''} · 🔥 Live`;
+    } else {
+      // ถ้าไม่มีข้อมูลใน Firebase ให้ใช้ builtin (CNX เท่านั้น)
+      allFlights = airport === 'CNX' ? BUILTIN_FLIGHTS : [];
+      document.getElementById('sub-header').textContent =
+        `${airport} · ยังไม่มีข้อมูล — กรุณาอัปโหลด Excel`;
+    }
+    init();
+  });
 }
 
 function loadFromStorage() {
-  try {
-    const c = localStorage.getItem(LS_CUSTOM);
-    const o = localStorage.getItem(LS_OVERRIDE);
-    if (c) customIATA = JSON.parse(c);
-    if (o) flightOverrides = JSON.parse(o);
-  } catch(e) {}
+  // โหลด Override + Custom IATA แบบ real-time (ใช้ร่วมกันทุกสนามบิน)
+  refOverrides.on('value', snap => {
+    flightOverrides = snap.val() || {};
+    init();
+  });
+  refCustom.on('value', snap => {
+    customIATA = snap.val() || {};
+    init();
+  });
+  // โหลด flight data สนามบินแรก (CNX)
+  listenFlightData(currentAirport);
+  // แสดงสถานะ connection
+  db.ref('.info/connected').on('value', snap => {
+    if (snap.val()) showSyncStatus('online');
+  });
 }
 
 loadFromStorage();
@@ -937,12 +1041,29 @@ document.getElementById('xlFile').addEventListener('change', e => {
     try {
       const parsed = parseXlsx(ev.target.result);
       if (!parsed.length) { alert('ไม่พบข้อมูลใน sheet "Flight Summary"'); return; }
-      allFlights = parsed;
       const m = file.name.match(/\d{4}-\d{2}-\d{2}/);
-      const dateStr = m ? m[0] : file.name;
-      document.getElementById('report-date').textContent = dateStr;
-      document.getElementById('sub-header').textContent = `Chiang Mai International Airport (CNX) · ${dateStr}`;
-      init();
+      const dateStr = m ? m[0] : new Date().toISOString().slice(0,10);
+      const airport = document.getElementById('airport-select').value;
+
+      // Push ลง Firebase แยกตามสนามบิน
+      showSyncStatus('saving');
+      db.ref('flightData/' + airport).set({
+        flights: parsed,
+        date: dateStr,
+        airport: airport,
+        updatedAt: Date.now()
+      }).then(() => {
+        showSyncStatus('saved');
+        // listener ใน loadFromStorage จะ update allFlights อัตโนมัติ
+      }).catch(() => {
+        // fallback: แสดงใน local ถ้า Firebase ล้มเหลว
+        allFlights = parsed;
+        showSyncStatus('error');
+        document.getElementById('report-date').textContent = dateStr;
+        document.getElementById('sub-header').textContent =
+          `${airport} · ${dateStr} · (local only)`;
+        init();
+      });
     } catch(err) { alert('อ่านไฟล์ไม่ได้: ' + err.message); }
   };
   reader.readAsArrayBuffer(file);
@@ -950,7 +1071,7 @@ document.getElementById('xlFile').addEventListener('change', e => {
 });
 
 // =============================================
-// INIT
+// INIT — called by Firebase listeners on load
 // =============================================
 function init() {
   renderStats();
@@ -959,8 +1080,6 @@ function init() {
   else if (currentTab === 'flights') renderFlights();
   else if (currentTab === 'unknown') renderUnknown();
 }
-
-init();
 </script>
 <!-- MODAL: QUICK OVERRIDE -->
 <div class="modal-overlay hidden" id="quick-override-modal" onclick="if(event.target===this)this.classList.add('hidden')">
