@@ -146,11 +146,32 @@
   .modal-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 18px; }
 
   /* CUSTOM IATA LIST */
-  .iata-list { max-height: 180px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 14px; }
+  .iata-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 14px; }
   .iata-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .iata-item:last-child { border-bottom: none; }
   .iata-item-code { font-family: var(--mono); font-weight: 600; width: 36px; flex-shrink: 0; }
   .iata-item-name { flex: 1; color: var(--text2); }
+
+  /* FLIGHT OVERRIDE LIST */
+  .override-list { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); margin-bottom: 14px; }
+  .override-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .override-item:last-child { border-bottom: none; }
+  .override-item-flight { font-family: var(--mono); font-weight: 600; width: 72px; flex-shrink: 0; color: var(--blue); }
+  .override-item-info { flex: 1; color: var(--text2); }
+
+  /* TABS INSIDE MODAL */
+  .modal-tab-bar { display: flex; gap: 0; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); overflow: hidden; margin-bottom: 14px; }
+  .modal-tab { padding: 7px 14px; font-size: 12px; font-weight: 500; cursor: pointer; color: var(--text2); background: transparent; border: none; border-right: 1px solid var(--border); transition: all .15s; font-family: var(--font); }
+  .modal-tab:last-child { border-right: none; }
+  .modal-tab.active { background: var(--blue); color: white; }
+  .modal-tab:hover:not(.active) { background: var(--surface); color: var(--text); }
+
+  /* SAVE INDICATOR */
+  .save-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 20px; font-size: 11px; background: var(--green-bg); color: var(--green-text); border: 1px solid #b8e4bf; font-weight: 500; }
+  .save-badge-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
+
+  /* INTER FLIGHT BADGE */
+  .badge-inter-flight { background: #e8f0fb; color: #0d3d72; border: 1px solid #c2d6f5; font-size: 9px; padding: 2px 6px; border-radius: 10px; margin-left: 4px; }
 
   /* HIDDEN */
   .hidden { display: none !important; }
@@ -194,6 +215,7 @@
     </div>
     <div class="header-actions">
       <span class="chip-date" id="report-date">2026-04-26</span>
+      <span class="save-badge hidden" id="save-badge"><span class="save-badge-dot"></span>บันทึกแล้ว</span>
       <button class="btn" onclick="showIataManager()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
         จัดการ IATA
@@ -248,6 +270,7 @@
             <th class="num">Kiosk<br>(Row 44)</th>
             <th class="num">Security<br>(Row 102)</th>
             <th class="num">Boarding<br>(Row 107)</th>
+            <th>Override</th>
           </tr>
         </thead>
         <tbody id="flight-tbody"></tbody>
@@ -276,37 +299,82 @@
 
 <!-- MODAL: IATA MANAGER -->
 <div class="modal-overlay hidden" id="iata-modal" onclick="if(event.target===this)this.classList.add('hidden')">
-  <div class="modal">
-    <div class="modal-title">จัดการฐานข้อมูล IATA</div>
-    <div class="modal-sub">เพิ่มหรือลบ IATA Code เพื่อให้ระบบจำแนกสายการบินและประเภทเที่ยวบินได้ถูกต้อง</div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">IATA Code (2 ตัวอักษร)</label>
-        <input class="form-input" id="new-iata" maxlength="3" placeholder="เช่น AK" style="text-transform:uppercase;font-family:var(--mono)">
-      </div>
-      <div class="form-group">
-        <label class="form-label">ชื่อสายการบิน</label>
-        <input class="form-input" id="new-name" placeholder="เช่น AirAsia">
-      </div>
+  <div class="modal" style="width:520px">
+    <div class="modal-title">จัดการฐานข้อมูล IATA &amp; เที่ยวบิน</div>
+    <div class="modal-sub">เพิ่ม IATA Code ใหม่ หรือกำหนดประเภทรายเที่ยวบิน (เช่น FD0870 เป็น Inter)</div>
+
+    <!-- Tabs inside modal -->
+    <div class="modal-tab-bar">
+      <button class="modal-tab active" id="mtab-iata" onclick="switchModalTab('iata')">➕ เพิ่ม IATA</button>
+      <button class="modal-tab" id="mtab-override" onclick="switchModalTab('override')">✈ Override เที่ยวบิน</button>
+      <button class="modal-tab" id="mtab-custom" onclick="switchModalTab('custom')">📋 รายการ Custom</button>
     </div>
-    <div class="form-row">
-      <div class="form-group">
-        <label class="form-label">ประเทศ</label>
-        <input class="form-input" id="new-country" placeholder="เช่น Malaysia">
+
+    <!-- Panel: Add IATA -->
+    <div id="mpanel-iata">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">IATA Code (2-3 ตัวอักษร)</label>
+          <input class="form-input" id="new-iata" maxlength="3" placeholder="เช่น AK" style="text-transform:uppercase;font-family:var(--mono)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ชื่อสายการบิน</label>
+          <input class="form-input" id="new-name" placeholder="เช่น AirAsia">
+        </div>
       </div>
-      <div class="form-group">
-        <label class="form-label">ประเภทเที่ยวบิน</label>
-        <select class="form-input" id="new-type">
-          <option value="Domestic">ในประเทศ (Domestic)</option>
-          <option value="International">ต่างประเทศ (International)</option>
-        </select>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">ประเทศ</label>
+          <input class="form-input" id="new-country" placeholder="เช่น Malaysia">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ประเภทเที่ยวบิน</label>
+          <select class="form-input" id="new-type">
+            <option value="Domestic">ในประเทศ (Domestic)</option>
+            <option value="International">ต่างประเทศ (International)</option>
+          </select>
+        </div>
       </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="addIata()">
+        เพิ่ม IATA Code ใหม่
+      </button>
     </div>
-    <button class="btn btn-primary" style="width:100%;justify-content:center;margin-bottom:16px" onclick="addIata()">
-      เพิ่ม IATA Code ใหม่
-    </button>
-    <div class="section-title">IATA ที่เพิ่มเอง</div>
-    <div class="iata-list" id="custom-iata-list"></div>
+
+    <!-- Panel: Flight Override -->
+    <div id="mpanel-override" class="hidden">
+      <div class="alert alert-info" style="margin-bottom:12px;font-size:12px">
+        ✈ ใช้สำหรับเที่ยวบินที่ IATA เดิมเป็น Domestic แต่เที่ยวบินนั้นบินระหว่างประเทศ เช่น <strong>FD0870</strong>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">รหัสเที่ยวบิน (Flight No.)</label>
+          <input class="form-input" id="ov-flight" maxlength="10" placeholder="เช่น FD0870" style="text-transform:uppercase;font-family:var(--mono)">
+        </div>
+        <div class="form-group">
+          <label class="form-label">ประเภทที่ถูกต้อง</label>
+          <select class="form-input" id="ov-type">
+            <option value="International">ต่างประเทศ (International)</option>
+            <option value="Domestic">ในประเทศ (Domestic)</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group" style="margin-bottom:12px">
+        <label class="form-label">ปลายทาง / หมายเหตุ (ไม่บังคับ)</label>
+        <input class="form-input" id="ov-note" placeholder="เช่น Kuala Lumpur (KUL)">
+      </div>
+      <button class="btn btn-primary" style="width:100%;justify-content:center" onclick="addFlightOverride()">
+        บันทึก Override เที่ยวบิน
+      </button>
+      <div class="section-title" style="margin-top:14px">Override ที่บันทึกไว้</div>
+      <div class="override-list" id="override-list"></div>
+    </div>
+
+    <!-- Panel: Custom IATA list -->
+    <div id="mpanel-custom" class="hidden">
+      <div class="section-title">IATA ที่เพิ่มเอง</div>
+      <div class="iata-list" id="custom-iata-list"></div>
+    </div>
+
     <div class="modal-actions">
       <button class="btn" onclick="document.getElementById('iata-modal').classList.add('hidden')">ปิด</button>
     </div>
@@ -404,8 +472,38 @@ const BUILTIN_IATA = {
 };
 
 let customIATA = {};
+let flightOverrides = {}; // { 'FD0870': { type:'International', note:'KUL' }, ... }
 let currentClassifyCode = null;
 let currentTab = 'cards';
+
+// =============================================
+// LOCALSTORAGE PERSISTENCE
+// =============================================
+const LS_CUSTOM = 'bioDash_customIATA';
+const LS_OVERRIDE = 'bioDash_flightOverrides';
+
+function saveToStorage() {
+  try {
+    localStorage.setItem(LS_CUSTOM, JSON.stringify(customIATA));
+    localStorage.setItem(LS_OVERRIDE, JSON.stringify(flightOverrides));
+    // Flash save badge
+    const badge = document.getElementById('save-badge');
+    badge.classList.remove('hidden');
+    clearTimeout(badge._timer);
+    badge._timer = setTimeout(() => badge.classList.add('hidden'), 2500);
+  } catch(e) { /* localStorage not available (e.g. private mode) */ }
+}
+
+function loadFromStorage() {
+  try {
+    const c = localStorage.getItem(LS_CUSTOM);
+    const o = localStorage.getItem(LS_OVERRIDE);
+    if (c) customIATA = JSON.parse(c);
+    if (o) flightOverrides = JSON.parse(o);
+  } catch(e) {}
+}
+
+loadFromStorage();
 
 function getIata(code) {
   return customIATA[code] || BUILTIN_IATA[code] || null;
@@ -482,27 +580,37 @@ let allFlights = BUILTIN_FLIGHTS;
 function enrichFlight(f) {
   const iata = f.flight.slice(0, 2);
   const info = getIata(iata);
+  // Flight-level override takes precedence over IATA-level type
+  const ovr = flightOverrides[f.flight.toUpperCase()];
+  const resolvedType = ovr ? ovr.type : (info ? info.type : 'Unknown');
   return {
     ...f, iata,
     airline: info ? info.name : 'Unknown',
-    type: info ? info.type : 'Unknown',
+    type: resolvedType,
     country: info ? info.country : '—',
     color: info ? (info.color || '#888') : '#9e9b94',
     isNew: !!customIATA[iata],
     isUnknown: !info,
+    hasOverride: !!ovr,
+    overrideNote: ovr ? ovr.note : '',
   };
 }
 
 function getEnriched() { return allFlights.map(enrichFlight); }
 
 function aggByAirline(data) {
+  // Key = iata + '|' + type  →  FD·Domestic and FD·International become separate cards
   const map = {};
   data.forEach(d => {
-    if (!map[d.iata]) map[d.iata] = { iata:d.iata, airline:d.airline, type:d.type, country:d.country, color:d.color, isNew:d.isNew, isUnknown:d.isUnknown, flights:0, r17:0, r37:0, r44:0, r102:0, r107:0 };
-    const m = map[d.iata];
-    m.flights++; m.r17+=d.r17; m.r37+=d.r37; m.r44+=d.r44; m.r102+=d.r102; m.r107+=d.r107;
+    const key = d.iata + '|' + d.type;
+    if (!map[key]) map[key] = { iata:d.iata, airline:d.airline, type:d.type, country:d.country, color:d.color, isNew:d.isNew, isUnknown:d.isUnknown, flightList:[], r17:0, r37:0, r44:0, r102:0, r107:0 };
+    const m = map[key];
+    m.flightList.push(d.flight);
+    m.r17+=d.r17; m.r37+=d.r37; m.r44+=d.r44; m.r102+=d.r102; m.r107+=d.r107;
   });
-  return Object.values(map).sort((a,b) => b.r17 - a.r17);
+  return Object.values(map)
+    .map(m => ({ ...m, flights: m.flightList.length }))
+    .sort((a,b) => b.r17 - a.r17);
 }
 
 function fmt(n) { return Number(n).toLocaleString('th-TH'); }
@@ -541,8 +649,6 @@ function renderCards() {
   const filterType = document.getElementById('fc-type').value;
   let airlines = aggByAirline(getEnriched().filter(d => !d.isUnknown));
   if (filterType) airlines = airlines.filter(a => a.type === filterType);
-  const maxR102 = Math.max(...airlines.map(a => a.r102), 1);
-  const maxR107 = Math.max(...airlines.map(a => a.r107), 1);
 
   if (!airlines.length) {
     document.getElementById('airline-cards').innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✈</div>ไม่พบข้อมูล</div>';
@@ -550,11 +656,20 @@ function renderCards() {
   }
 
   document.getElementById('airline-cards').innerHTML = airlines.map(a => {
-    const enrollPct = a.r17 > 0 ? ((a.r37 + a.r44) / a.r17 * 100).toFixed(0) : 0;
     const typeBadge = a.type === 'International'
       ? '<span class="badge badge-intl">ต่างประเทศ</span>'
       : '<span class="badge badge-dom">ในประเทศ</span>';
     const newBadge = a.isNew ? ' <span class="badge badge-new" style="margin-top:4px;display:inline-block">เพิ่งเพิ่ม</span>' : '';
+    // Detect if this card is a split (override caused iata to appear in multiple types)
+    const allKeys = airlines.filter(x => x.iata === a.iata);
+    const isSplit = allKeys.length > 1;
+    const splitLabel = isSplit
+      ? `<div style="font-size:10px;color:var(--amber);font-weight:600;margin-top:3px">✂ แยกจาก override</div>` : '';
+    // Check if any override flights belong to this card
+    const overriddenFlights = a.flightList.filter(f => flightOverrides[f]);
+    const overrideBadge = overriddenFlights.length > 0
+      ? `<div style="font-size:10px;color:var(--blue-text);margin-top:2px">override: ${overriddenFlights.join(', ')}</div>` : '';
+
     return `
     <div class="acard">
       <div class="acard-hdr">
@@ -562,6 +677,7 @@ function renderCards() {
           <div class="acard-iata" style="color:${a.color}">${a.iata}</div>
           <div class="acard-name">${a.airline}</div>
           <div class="acard-country">${a.country}</div>
+          ${splitLabel}${overrideBadge}
         </div>
         <div class="acard-meta">
           ${typeBadge}${newBadge}
@@ -618,9 +734,14 @@ function renderFlights() {
   const typeBadge = t => t==='International'
     ? '<span class="badge badge-intl">ต่างประเทศ</span>'
     : '<span class="badge badge-dom">ในประเทศ</span>';
-  document.getElementById('flight-tbody').innerHTML = data.map(d => `
+  document.getElementById('flight-tbody').innerHTML = data.map(d => {
+    const ovr = flightOverrides[d.flight];
+    const ovrBtn = ovr
+      ? `<button class="btn btn-sm btn-danger" onclick="removeOverride('${d.flight}')" title="ลบ override">✕ Inter</button>`
+      : `<button class="btn btn-sm" onclick="quickOverride('${d.flight}','${d.type}')" style="font-size:11px">✎ Override</button>`;
+    return `
     <tr>
-      <td><strong style="color:${d.color};font-family:var(--mono)">${d.flight}</strong>${d.isNew?' <span class="badge badge-new" style="font-size:9px">ใหม่</span>':''}</td>
+      <td><strong style="color:${d.color};font-family:var(--mono)">${d.flight}</strong>${d.isNew?' <span class="badge badge-new" style="font-size:9px">ใหม่</span>':''}${d.hasOverride?`<span class="badge-inter-flight">override</span>`:''}</td>
       <td><span style="font-family:var(--mono);font-weight:600">${d.iata}</span></td>
       <td>${d.airline}</td>
       <td style="color:var(--text3);font-size:12px">${d.country}</td>
@@ -630,7 +751,9 @@ function renderFlights() {
       <td class="num">${fmt(d.r44)}</td>
       <td class="num" style="color:#2d7a3a;font-weight:600">${fmt(d.r102)}</td>
       <td class="num" style="color:#1a5fa8;font-weight:600">${fmt(d.r107)}</td>
-    </tr>`).join('') || '<tr><td colspan="10" class="empty">ไม่พบข้อมูล</td></tr>';
+      <td>${ovrBtn}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="11" class="empty">ไม่พบข้อมูล</td></tr>';
   document.getElementById('flight-tfoot').innerHTML = `
     <tr>
       <td colspan="5" class="tfoot-lbl">รวม ${data.length} เที่ยวบิน</td>
@@ -639,6 +762,7 @@ function renderFlights() {
       <td class="num tfoot">${fmt(tot.r44)}</td>
       <td class="num tfoot" style="color:#2d7a3a">${fmt(tot.r102)}</td>
       <td class="num tfoot" style="color:#1a5fa8">${fmt(tot.r107)}</td>
+      <td></td>
     </tr>`;
 }
 
@@ -685,7 +809,17 @@ function setTab(tab, el) {
 // =============================================
 function showIataManager() {
   renderCustomList();
+  renderOverrideList();
   document.getElementById('iata-modal').classList.remove('hidden');
+}
+
+function switchModalTab(tab) {
+  ['iata','override','custom'].forEach(t => {
+    document.getElementById('mpanel-'+t).classList.toggle('hidden', t !== tab);
+    document.getElementById('mtab-'+t).classList.toggle('active', t === tab);
+  });
+  if (tab === 'custom') renderCustomList();
+  if (tab === 'override') renderOverrideList();
 }
 
 function renderCustomList() {
@@ -701,6 +835,18 @@ function renderCustomList() {
       </div>`).join('');
 }
 
+function renderOverrideList() {
+  const entries = Object.entries(flightOverrides);
+  document.getElementById('override-list').innerHTML = entries.length === 0
+    ? '<div style="padding:12px;font-size:12px;color:var(--text3);text-align:center">ยังไม่มี Override เที่ยวบิน</div>'
+    : entries.map(([flight, info]) => `
+      <div class="override-item">
+        <span class="override-item-flight">${flight}</span>
+        <span class="override-item-info">${info.type==='International'?'🌏 ต่างประเทศ':'🇹🇭 ในประเทศ'}${info.note?' · '+info.note:''}</span>
+        <button class="btn btn-sm btn-danger" onclick="deleteFlightOverride('${flight}')">ลบ</button>
+      </div>`).join('');
+}
+
 function addIata() {
   const code = document.getElementById('new-iata').value.trim().toUpperCase();
   const name = document.getElementById('new-name').value.trim();
@@ -712,15 +858,34 @@ function addIata() {
   document.getElementById('new-iata').value = '';
   document.getElementById('new-name').value = '';
   document.getElementById('new-country').value = '';
+  saveToStorage();
   renderCustomList();
+  init();
+}
+
+function addFlightOverride() {
+  const flight = document.getElementById('ov-flight').value.trim().toUpperCase();
+  const type = document.getElementById('ov-type').value;
+  const note = document.getElementById('ov-note').value.trim();
+  if (!flight) { alert('กรุณากรอกรหัสเที่ยวบิน'); return; }
+  flightOverrides[flight] = { type, note };
+  document.getElementById('ov-flight').value = '';
+  document.getElementById('ov-note').value = '';
+  saveToStorage();
+  renderOverrideList();
   init();
 }
 
 function deleteCustomIata(code) {
   if (!confirm(`ลบ IATA "${code}" ออกจากฐานข้อมูล?`)) return;
   delete customIATA[code];
+  saveToStorage();
   renderCustomList();
   init();
+}
+
+function deleteFlightOverride(flight) {
+  removeOverride(flight);
 }
 
 function openClassify(iataCode) {
@@ -739,6 +904,7 @@ function saveClassify() {
   if (!name) { alert('กรุณากรอกชื่อสายการบิน'); return; }
   const palette = ['#c0392b','#2980b9','#27ae60','#8e44ad','#16a085','#d35400'];
   customIATA[currentClassifyCode] = { name, country: country||'Unknown', type, color: palette[Object.keys(customIATA).length % palette.length] };
+  saveToStorage();
   document.getElementById('classify-modal').classList.add('hidden');
   init();
   if (currentTab === 'unknown') renderUnknown();
@@ -795,6 +961,66 @@ function init() {
 }
 
 init();
+</script>
+<!-- MODAL: QUICK OVERRIDE -->
+<div class="modal-overlay hidden" id="quick-override-modal" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal" style="width:400px">
+    <div class="modal-title">Override ประเภทเที่ยวบิน</div>
+    <div class="modal-sub">เที่ยวบิน: <strong id="qo-flight-label" style="font-family:var(--mono);color:var(--blue)"></strong></div>
+    <div class="alert alert-info" style="margin-bottom:14px;font-size:12px">
+      ปัจจุบันจำแนกเป็น <strong id="qo-current-type"></strong> — เลือกประเภทที่ถูกต้องด้านล่าง
+    </div>
+    <div class="form-group" style="margin-bottom:12px">
+      <label class="form-label">ประเภทที่ถูกต้อง</label>
+      <select class="form-input" id="qo-type">
+        <option value="International">🌏 ต่างประเทศ (International)</option>
+        <option value="Domestic">🇹🇭 ในประเทศ (Domestic)</option>
+      </select>
+    </div>
+    <div class="form-group" style="margin-bottom:16px">
+      <label class="form-label">ปลายทาง / หมายเหตุ (ไม่บังคับ)</label>
+      <input class="form-input" id="qo-note" placeholder="เช่น Kuala Lumpur (KUL)">
+    </div>
+    <div class="modal-actions">
+      <button class="btn" onclick="document.getElementById('quick-override-modal').classList.add('hidden')">ยกเลิก</button>
+      <button class="btn btn-primary" onclick="saveQuickOverride()">💾 บันทึก Override</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let _qoFlight = null;
+
+function quickOverride(flight, currentType) {
+  _qoFlight = flight;
+  document.getElementById('qo-flight-label').textContent = flight;
+  document.getElementById('qo-current-type').textContent = currentType === 'International' ? 'ต่างประเทศ' : 'ในประเทศ';
+  document.getElementById('qo-type').value = currentType === 'International' ? 'Domestic' : 'International';
+  document.getElementById('qo-note').value = '';
+  document.getElementById('quick-override-modal').classList.remove('hidden');
+}
+
+function saveQuickOverride() {
+  if (!_qoFlight) return;
+  const type = document.getElementById('qo-type').value;
+  const note = document.getElementById('qo-note').value.trim();
+  flightOverrides[_qoFlight] = { type, note };
+  saveToStorage();
+  document.getElementById('quick-override-modal').classList.add('hidden');
+  init();
+  if (currentTab === 'flights') renderFlights();
+  // re-render override list if modal open
+  try { renderOverrideList(); } catch(e){}
+}
+
+function removeOverride(flight) {
+  if (!confirm(`ลบ Override ของเที่ยวบิน "${flight}"?`)) return;
+  delete flightOverrides[flight];
+  saveToStorage();
+  init();
+  if (currentTab === 'flights') renderFlights();
+  try { renderOverrideList(); } catch(e){}
+}
 </script>
 </body>
 </html>
